@@ -1,5 +1,6 @@
 /* Решение из урока №3 (на основе optional) */
 #include <algorithm>
+#include <numeric>
 #include <cmath>
 #include <iostream>
 #include <map>
@@ -11,6 +12,7 @@
 using namespace std;
 
 const int MAX_RESULT_DOCUMENT_COUNT = 5;
+const double MIN_DELTA = 1e-6;
 
 string ReadLine() {
     string s;
@@ -122,23 +124,13 @@ public:
 template <typename DocumentPredicate>
  vector<Document> FindTopDocuments(const string& raw_query, DocumentPredicate document_predicate) const {
 
-        if (raw_query.empty()) {
-            throw  invalid_argument("Пустой запрос"s);
-        }
-
-        for (const string& word : SplitIntoWords(raw_query)) {
-            if (!IsValidWord(word))
-                throw  invalid_argument("В запросе содержатся спецсимволы"s);
-            if ((word=="-"s)||(word[0]=='-'&& word[1]=='-'))
-                throw  invalid_argument("Ошибка в минус-словах"s);
-        }
 
         const Query query = ParseQuery(raw_query);
         auto matched_documents = FindAllDocuments(query, document_predicate);
 
         sort(matched_documents.begin(), matched_documents.end(),
              [](const Document& lhs, const Document& rhs) {
-                 if (abs(lhs.relevance - rhs.relevance) < 1e-6) {
+                 if (abs(lhs.relevance - rhs.relevance) < MIN_DELTA) {
                      return lhs.rating > rhs.rating;
                  } else {
                      return lhs.relevance > rhs.relevance;
@@ -168,14 +160,7 @@ template <typename DocumentPredicate>
     }
 
     tuple<vector<string>, DocumentStatus> MatchDocument(const string& raw_query, int document_id) const {
-        if(raw_query.empty())
-            throw  invalid_argument("Пустой запрос"s);
-        for (const string& word : SplitIntoWords(raw_query)) {
-            if (!IsValidWord(word))
-                throw  invalid_argument("В запросе содержатся спецсимволы"s);
-            if ((word=="-"s)||(word[0]=='-'&& word[1]=='-'))
-                throw  invalid_argument("Ошибка в минус-словах"s);
-        }
+
         const Query query = ParseQuery(raw_query);
         vector<string> matched_words;
         for (const string& word : query.plus_words) {
@@ -239,10 +224,8 @@ private:
         if (ratings.empty()) {
             return 0;
         }
-        int rating_sum = 0;
-        for (const int rating : ratings) {
-            rating_sum += rating;
-        }
+        int rating_sum = accumulate(ratings.begin(), ratings.end(),0);
+
         return rating_sum / static_cast<int>(ratings.size());
     }
 
@@ -253,6 +236,15 @@ private:
     };
 
     QueryWord ParseQueryWord(string text) const {
+    	 if (text.empty()) {
+    	         throw  invalid_argument("Пустой запрос"s);
+    	        }
+    	 for (const string& word : SplitIntoWords(text)) {
+    	     if (!IsValidWord(word))
+    	         throw  invalid_argument("В запросе содержатся спецсимволы"s);
+    	     if ((word=="-"s)||(word[0]=='-'&& word[1]=='-'))
+    	         throw  invalid_argument("Ошибка в минус-словах"s);
+    	     }
         bool is_minus = false;
         // Word shouldn't be empty
         if (text[0] == '-') {
@@ -347,6 +339,6 @@ int main() {
         catch (const out_of_range& e) {
         cout << "Ошибка: "s << e.what() << endl;
         }
-   
+
 }
 
