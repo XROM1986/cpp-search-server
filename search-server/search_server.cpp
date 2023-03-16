@@ -11,7 +11,7 @@ using namespace std;
 
     {
     }
-
+//Добавление нового документа
     void SearchServer::AddDocument(int document_id, const string& document, DocumentStatus status,
                      const vector<int>& ratings) {
         if ((document_id < 0) || (documents_.count(document_id) > 0)) {
@@ -21,10 +21,15 @@ using namespace std;
         const double inv_word_count = 1.0 / words.size();
         for (const string& word : words) {
             word_to_document_freqs_[word][document_id] += inv_word_count;
+  document_to_word_freqs_[document_id][word] += inv_word_count;
+          
         }
         documents_.emplace(document_id, DocumentData{ComputeAverageRating(ratings), status});
-        document_ids_.push_back(document_id);
+        document_ids_.insert(document_id);
     }
+
+
+    
 
 
 
@@ -38,13 +43,48 @@ using namespace std;
     vector<Document> SearchServer::FindTopDocuments(const string& raw_query) const {
         return FindTopDocuments(raw_query, DocumentStatus::ACTUAL);
     }
+
+//Получение частот слов по id документа
+    const map<string, double>& SearchServer::GetWordFrequencies(int document_id) const {
+    static const map<string, double> zero;
+
+    if (document_to_word_freqs_.count(document_id)) {
+        return document_to_word_freqs_.at(document_id);
+    }
+    else {
+        return zero;
+    }      
+}
+//Возврат количества документов
     int SearchServer::GetDocumentCount() const {
         return documents_.size();
     }
-    int SearchServer::GetDocumentId(int index) const {
-        return document_ids_.at(index);
-    }
 
+
+std::set<int>::const_iterator SearchServer::begin() const {
+    return document_ids_.begin();
+}
+
+
+std::set<int>::const_iterator SearchServer::end() const {
+    return document_ids_.end();
+}
+
+//Удаление документа из поискового сервера
+    void SearchServer::RemoveDocument(int document_id) {
+        
+   if (document_ids_.find(document_id) == document_ids_.end()){
+        return;
+    }   
+        for (auto [word, freq] : document_to_word_freqs_.at(document_id)) {
+        word_to_document_freqs_.at(word).erase(document_id);
+    }
+    document_to_word_freqs_.erase(document_id);
+    document_ids_.erase(document_id);
+ documents_.erase(document_id);
+}
+
+//Возврат списка совпавших слов запроса
     tuple<vector<string>, DocumentStatus> SearchServer::MatchDocument(const string& raw_query,
                                                         int document_id) const {
         const auto query = ParseQuery(raw_query);
@@ -70,15 +110,19 @@ using namespace std;
         return {matched_words, documents_.at(document_id).status};
     }
 
+//Проверка входящего слова на принадлежность к стоп-словам
     bool SearchServer::IsStopWord(const string& word) const {
         return stop_words_.count(word) > 0;
     }
+
+//Проверка на отсутствие в слове спецсимволов
     bool SearchServer::IsValidWord(const string& word) {
-        // A valid word must not contain special characters
         return none_of(word.begin(), word.end(), [](char c) {
             return c >= '\0' && c < ' ';
         });
     }
+
+//Разбивка строки запроса на вектор слов, исключая стоп-слова
     std::vector<string> SearchServer::SplitIntoWordsNoStop(const string& text) const {
     	std::vector<std::string> words;
         for (const string& word : SplitIntoWords(text)) {
@@ -91,6 +135,8 @@ using namespace std;
         }
         return words;
     }
+
+//Подсчет среднего рейтинга
     int SearchServer::ComputeAverageRating(const vector<int>& ratings) {
         int rating_sum = 0;
         for (const int rating : ratings) {
@@ -99,6 +145,7 @@ using namespace std;
         return rating_sum / static_cast<int>(ratings.size());
     }
 
+//Удалеие "-" у минус-слов
     SearchServer::QueryWord SearchServer::ParseQueryWord(const string& text) const {
         if (text.empty()) {
             throw invalid_argument("Query word is empty"s);
@@ -115,6 +162,7 @@ using namespace std;
         return {word, is_minus, IsStopWord(word)};
     }
 
+//Создание списков плюс- и минус-слов
     SearchServer::Query SearchServer::ParseQuery(const string& text) const {
         Query result;
         for (const string& word : SplitIntoWords(text)) {
@@ -130,7 +178,7 @@ using namespace std;
         return result;
     }
 
-
+//Вычисление IDF слова
     double SearchServer::ComputeWordInverseDocumentFreq(const string& word) const {
         return log(GetDocumentCount() * 1.0 / word_to_document_freqs_.at(word).size());
     }

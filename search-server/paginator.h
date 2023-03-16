@@ -52,7 +52,7 @@ public:
             begin = current_page_end;
         }
     }
- 
+
     auto begin() const {
         return pages_.begin();
     }
@@ -68,7 +68,7 @@ public:
 private:
     std::vector<IteratorRange<Iterator>> pages_;
 };
- 
+
 template <typename Container>
 auto Paginate(const Container& c, size_t page_size) {
     return Paginator(begin(c), end(c), page_size);
