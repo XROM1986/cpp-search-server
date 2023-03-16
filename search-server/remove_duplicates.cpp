@@ -4,19 +4,26 @@ using namespace std;
 
 void RemoveDuplicates(SearchServer& search_server) {
     set<int> duplicates;
-    set<set<string_view>> docs;
-    for (auto i = search_server.begin(); i != search_server.end(); ++i) {
-        const auto& doc = search_server.GetWordFrequencies(*i);
-        set<string_view> doc_words;
+    map<set<string>, int> docs;
+    for (auto id = search_server.begin(); id != search_server.end(); ++id) {
+        const auto& doc = search_server.GetWordFrequencies(*id);
+        set<string> doc_words;
 
-        for (const auto& [word, freq] : doc) {
+        for (const auto& [word, _] : doc) {
             doc_words.insert(word);
         }
         if (docs.count(doc_words)) {
-            duplicates.insert(*i);
+            
+            auto it = docs.find(doc_words);
+            if(*id>it->second){
+            duplicates.insert(*id);
+                }
+            else{
+                duplicates.insert(it->second);
+            }
         }
         else {
-            docs.insert(doc_words);
+            docs[doc_words]=*id;
         }
     }
 

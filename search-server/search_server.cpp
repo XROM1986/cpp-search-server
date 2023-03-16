@@ -46,13 +46,13 @@ using namespace std;
 
 //Получение частот слов по id документа
     const map<string, double>& SearchServer::GetWordFrequencies(int document_id) const {
-    static const map<string, double> zero;
+    static const map<string, double> empty_result;
 
     if (document_to_word_freqs_.count(document_id)) {
         return document_to_word_freqs_.at(document_id);
     }
     else {
-        return zero;
+        return empty_result;
     }      
 }
 //Возврат количества документов
