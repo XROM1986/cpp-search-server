@@ -1,9 +1,5 @@
+
 #pragma once
-
-
-
-
-
 
 template <typename Iterator>
 class IteratorRange {
