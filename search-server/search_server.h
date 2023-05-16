@@ -17,7 +17,7 @@
 
 const int MAX_RESULT_DOCUMENT_COUNT = 5;
 const double MIN_DELTA = 1e-6;
-const int LOCK_COUNT = 8;
+const int LOCK_COUNT = 16;
 
 
 class SearchServer {
@@ -59,21 +59,22 @@ public:
     template <typename ExecutionPolicy>
     void RemoveDocument(ExecutionPolicy&& policy, int document_id);  
     
-    std::tuple<std::vector<std::string_view>, DocumentStatus> MatchDocument(std::string_view raw_query,
+  using ResultMatchDocument = std::tuple<std::vector<std::string_view>, DocumentStatus>;
+     ResultMatchDocument MatchDocument(std::string_view raw_query,
                                                         int document_id) const;
-    std::tuple<std::vector<std::string_view>, DocumentStatus> MatchDocument( const std::execution::sequenced_policy& policy, std::string_view raw_query, int document_id)  const; 
-    std::tuple<std::vector<std::string_view>, DocumentStatus>
-MatchDocument( const std::execution::parallel_policy& policy,std::string_view raw_query, int document_id)  const;
+     ResultMatchDocument MatchDocument( const std::execution::sequenced_policy& policy, std::string_view raw_query, int document_id)  const; 
+     ResultMatchDocument MatchDocument( const std::execution::parallel_policy& policy,std::string_view raw_query, int document_id)  const;
 
     
 private:
     struct DocumentData {
         int rating;
         DocumentStatus status;
+        std::string document_text;
     };
     const std::set<std::string, std::less<>> stop_words_;
 
-    std::map<std::string, std::map<int, double>> word_to_document_freqs_; 
+    std::map<std::string_view, std::map<int, double>> word_to_document_freqs_; 
    
     std::map<int, std::map<std::string_view, double>> document_to_word_freqs_;  
     std::map<int, DocumentData> documents_;
@@ -184,8 +185,8 @@ std::map<int, double> document_to_relevance;
 
     for_each (query.minus_words.begin(), query.minus_words.end(),
     [this, &document_to_relevance] (const std::string_view& word) {
-        if (word_to_document_freqs_.count(std::string(word)) != 0) {
-            for (const auto [document_id, _] : word_to_document_freqs_.at(std::string(word))) {
+        if (word_to_document_freqs_.count(word) != 0) {
+            for (const auto [document_id, _] : word_to_document_freqs_.at(word)) {
                 document_to_relevance.erase(document_id);
             }
         }
@@ -207,22 +208,11 @@ std::vector<Document> SearchServer::FindAllDocuments(const std::execution::paral
     ConcurrentMap<int, double> document_to_relevance(LOCK_COUNT);
 
     std::for_each(std::execution::par,
-        query.minus_words.begin(), query.minus_words.end(),
-        [this, &document_to_relevance](std::string_view word) {
-            if (word_to_document_freqs_.count(std::string(word))) {
-            
-               for (const auto [document_id, _] : word_to_document_freqs_.at(std::string(word))) {
-                    document_to_relevance[document_id];
-                }
-            }
-    });
-
-    std::for_each(std::execution::par,
         query.plus_words.begin(), query.plus_words.end(),
         [this, &document_predicate, &document_to_relevance](std::string_view word) {
-            if (word_to_document_freqs_.count(std::string(word))) {
+            if (word_to_document_freqs_.count(word)) {
                 const double inverse_document_freq = ComputeWordInverseDocumentFreq(word);
-                for (const auto [document_id, term_freq] : word_to_document_freqs_.at(std::string(word))) {
+                for (const auto [document_id, term_freq] : word_to_document_freqs_.at(word)) {
                     const auto& document_data = documents_.at(document_id);
                     if (document_predicate(document_id, document_data.status, document_data.rating)) {
                         document_to_relevance[document_id].ref_to_value += term_freq * inverse_document_freq;
