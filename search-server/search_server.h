@@ -62,21 +62,21 @@ public:
   using ResultMatchDocument = std::tuple<std::vector<std::string_view>, DocumentStatus>;
      ResultMatchDocument MatchDocument(std::string_view raw_query,
                                                         int document_id) const;
-     ResultMatchDocument MatchDocument( const std::execution::sequenced_policy& policy, std::string_view raw_query, int document_id)  const; 
-     ResultMatchDocument MatchDocument( const std::execution::parallel_policy& policy,std::string_view raw_query, int document_id)  const;
+ResultMatchDocument MatchDocument( const std::execution::sequenced_policy& policy, std::string_view raw_query, int document_id)  const; 
+ResultMatchDocument MatchDocument( const std::execution::parallel_policy& policy,std::string_view raw_query, int document_id)  const;
 
     
 private:
     struct DocumentData {
         int rating;
         DocumentStatus status;
-        std::string document_text;
     };
     const std::set<std::string, std::less<>> stop_words_;
 
     std::map<std::string_view, std::map<int, double>> word_to_document_freqs_; 
    
-    std::map<int, std::map<std::string_view, double>> document_to_word_freqs_;  
+    std::map<int, std::map<std::string_view, double>> document_to_word_freqs_; 
+    std::map<int, std::string> document_text_;
     std::map<int, DocumentData> documents_;
     std::set<int> document_ids_;
     bool IsStopWord( std::string_view word) const;
@@ -219,6 +219,15 @@ std::vector<Document> SearchServer::FindAllDocuments(const std::execution::paral
                     }
                 }
             }
+    });
+    
+    for_each (std::execution::par,query.minus_words.begin(), query.minus_words.end(),
+    [this, &document_to_relevance] (const std::string_view& word) {
+        if (word_to_document_freqs_.count(word) != 0) {
+            for (const auto [document_id, _] : word_to_document_freqs_.at(word)) {
+                document_to_relevance.Erase(document_id);
+            }
+        }
     });
 
     std::map<int, double> document_to_relevance_reduced = document_to_relevance.BuildOrdinaryMap();

@@ -18,9 +18,11 @@ SearchServer::SearchServer(const std::string& stop_words_text)
         if ((document_id < 0) || (documents_.count(document_id) > 0)) {
             throw std::invalid_argument("Invalid document_id"s);
         }
-    documents_.emplace(document_id, DocumentData{ SearchServer::ComputeAverageRating(ratings), status, std::string(document)});
+    documents_.emplace(document_id, DocumentData{ SearchServer::ComputeAverageRating(ratings), status});
+       
+       document_text_.emplace(document_id, std::string(document));
     
-    auto words = SplitIntoWordsNoStop(documents_.at(document_id).document_text);
+    auto words = SplitIntoWordsNoStop(document_text_.at(document_id));
  const double inv_word_count = 1.0 / words.size();   
     for (auto word : words) {
         word_to_document_freqs_[word][document_id] += inv_word_count;
